@@ -26,20 +26,20 @@ jobs:
       - name: Archive Executable
         run: |
           mkdir dist
-          copy target\release\your_program_name.exe dist\
-          Compress-Archive -Path dist\* -DestinationPath dist\your_program_name.zip
+          copy target\release\window_switcher.exe dist\
+          Compress-Archive -Path dist\* -DestinationPath dist\window_switcher.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-build
-          path: dist/your_program_name.zip
+          path: dist/window_switcher.zip
 
       - name: Upload Release (if tagged)
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
-          files: dist/your_program_name.zip
+          files: dist/window_switcher.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
