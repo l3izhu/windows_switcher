@@ -66,7 +66,7 @@ unsafe fn switch_window(direction: Direction) {
         })
         .filter_map(|hwnd| {
             let mut rect = RECT::default();
-            if GetWindowRect(hwnd, &mut rect).as_bool() {
+            if GetWindowRect(hwnd, &mut rect).is_ok() {
                 Some((hwnd, rect))
             } else {
                 None
