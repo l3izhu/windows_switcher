@@ -56,52 +56,56 @@ unsafe fn switch_window(direction: Direction) {
     let mut windows = Vec::new();
     EnumWindows(Some(enum_window_proc), LPARAM(&mut windows as *mut _ as isize));
 
-    let current_rect = {
-        let mut rect = RECT::default();
-        GetWindowRect(current, &mut rect);
-        rect
-    };
-    let current_monitor = MonitorFromWindow(current, MONITOR_DEFAULTTONEAREST);
-
-    // 找到在当前显示器上的、非最小化、可见窗口
-    let mut candidates = windows
+    // 获取所有有效窗口及其位置
+    let mut window_list = windows
         .into_iter()
         .filter(|&hwnd| {
             hwnd != current &&
             IsWindowVisible(hwnd).as_bool() &&
-            !IsIconic(hwnd).as_bool() &&
-            MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) == current_monitor
+            !IsIconic(hwnd).as_bool()
+        })
+        .filter_map(|hwnd| {
+            let mut rect = RECT::default();
+            if GetWindowRect(hwnd, &mut rect).as_bool() {
+                Some((hwnd, rect))
+            } else {
+                None
+            }
         })
         .collect::<Vec<_>>();
 
-    // 获取候选窗口的坐标
-    let mut target: Option<(HWND, i32)> = None;
-    for hwnd in candidates {
-        let mut rect = RECT::default();
-        if GetWindowRect(hwnd, &mut rect).as_bool() {
-            let dx = rect.left - current_rect.left;
-            match direction {
-                Direction::Left if dx < 0 => {
-                    let dist = dx.abs();
-                    if target.is_none() || dist < target.unwrap().1 {
-                        target = Some((hwnd, dist));
-                    }
-                }
-                Direction::Right if dx > 0 => {
-                    let dist = dx;
-                    if target.is_none() || dist < target.unwrap().1 {
-                        target = Some((hwnd, dist));
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
+    // 当前窗口也加入排序列表
+    let mut current_rect = RECT::default();
+    GetWindowRect(current, &mut current_rect);
+    window_list.push((current, current_rect));
 
-    if let Some((target_hwnd, _)) = target {
+    // 排序：按屏幕横向位置（left, top）
+    window_list.sort_by_key(|(_, rect)| (rect.left, rect.top));
+
+    // 找到当前窗口的位置
+    let idx = window_list.iter().position(|(hwnd, _)| *hwnd == current);
+    if let Some(pos) = idx {
+        let target_idx = match direction {
+            Direction::Left => {
+                if pos == 0 {
+                    window_list.len() - 1 // 循环到最后
+                } else {
+                    pos - 1
+                }
+            }
+            Direction::Right => {
+                if pos + 1 >= window_list.len() {
+                    0 // 循环到最前
+                } else {
+                    pos + 1
+                }
+            }
+        };
+        let target_hwnd = window_list[target_idx].0;
         SetForegroundWindow(target_hwnd);
     }
 }
+
 
 unsafe extern "system" fn enum_window_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
     let windows = &mut *(lparam.0 as *mut Vec<HWND>);
